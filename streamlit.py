@@ -7,9 +7,9 @@ def fetch_temperature_data():
     response = requests.get('http://192.168.43.73:5000/temperature')
     if response.status_code == 200:
         data = response.json()
-        return data['temperature']
+        return data['temperature'], data['humidity'], data['total_siswa']
     else:
-        return None
+        return None, None, None
 
 def streamlit_app():
     # Set page config
@@ -27,28 +27,43 @@ def streamlit_app():
         The data is updated continuously and visualized in the charts below.
     """)
 
-    # Metrics display
+    # Initialize empty lists to store data
     temperature_data = []
+    humidity_data = []
+    total_siswa_data = []
 
     if st.button('Fetch Temperature Data'):
-        temp = fetch_temperature_data()
-        if temp is not None:
-            temperature_data.append(temp)
-            current_temp = temp
+        temperature, humidity, total_siswa = fetch_temperature_data()
+        if temperature is not None:
+            temperature_data.append(temperature)
+            humidity_data.append(humidity)
+            total_siswa_data.append(total_siswa)
+            
+            current_temp = temperature
             avg_temp = sum(temperature_data) / len(temperature_data)
 
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             col1.metric("Current Temperature", f"{current_temp:.2f} °C")
-            col2.metric("Average Temperature", f"{avg_temp:.2f} °C")
+            col2.metric("Current Humidity", f"{humidity:.2f} %")
+            col3.metric("Total Students", f"{total_siswa}")
 
             # Temperature chart
-            st.line_chart(temperature_data)
+            st.line_chart(pd.DataFrame({
+                'Temperature (°C)': temperature_data
+            }, index=range(1, len(temperature_data) + 1)))
+
+            # Humidity chart
+            st.line_chart(pd.DataFrame({
+                'Humidity (%)': humidity_data
+            }, index=range(1, len(humidity_data) + 1)))
 
             # Display temperature data in DataFrame
-            st.header("Temperature Data Details")
+            st.header("Data Details")
             df = pd.DataFrame({
                 'Time': range(1, len(temperature_data) + 1),
-                'Temperature (°C)': temperature_data
+                'Temperature (°C)': temperature_data,
+                'Humidity (%)': humidity_data,
+                'Total Siswa': total_siswa_data
             })
             st.dataframe(df)
         else:
