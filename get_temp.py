@@ -1,10 +1,37 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import mysql.connector
+from mysql.connector import Error
 
 app = Flask(__name__)
 CORS(app)
 
-# In-memory storage for sensor data
+# Konfigurasi database MySQL
+db_config = {
+    'host': 'localhost',
+    'database': 'smart_presence',
+    'user': 'root',
+    'password': ''
+}
+
+# Fungsi untuk menyimpan data ke database
+def insert_data_to_db(temperature, humidity, total_siswa):
+    try:
+        connection = mysql.connector.connect(**db_config)
+        if connection.is_connected():
+            cursor = connection.cursor()
+            sql_insert_query = """INSERT INTO temperatures (temperature, humidity, total_siswa) 
+                                  VALUES (%s, %s, %s)"""
+            cursor.execute(sql_insert_query, (temperature, humidity, total_siswa))
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return True
+    except Error as e:
+        print(f"Error: {e}")
+        return False
+
+# In-memory storage for sensor data (optional, if needed for other purposes)
 sensor_data = {
     'temperature': [],
     'humidity': [],
@@ -14,10 +41,20 @@ sensor_data = {
 @app.route('/endpoint', methods=['POST'])
 def receive_data():
     data = request.get_json()
-    sensor_data['temperature'].append(data.get('temperature'))
-    sensor_data['humidity'].append(data.get('humidity'))
-    sensor_data['total_siswa'].append(data.get('total_siswa'))
-    return 'Data received', 200
+    temperature = data.get('temperature')
+    humidity = data.get('humidity')
+    total_siswa = data.get('total_siswa')
+    
+    # Simpan data ke dalam in-memory storage (optional)
+    sensor_data['temperature'].append(temperature)
+    sensor_data['humidity'].append(humidity)
+    sensor_data['total_siswa'].append(total_siswa)
+    
+    # Simpan data ke dalam database
+    if insert_data_to_db(temperature, humidity, total_siswa):
+        return 'Data received and stored in DB', 200
+    else:
+        return 'Data received but failed to store in DB', 500
 
 @app.route('/temperature')
 def get_temperature():
