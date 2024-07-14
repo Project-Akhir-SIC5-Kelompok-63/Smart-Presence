@@ -56,7 +56,7 @@ def receive_data():
     else:
         return 'Data received but failed to store in DB', 500
 
-@app.route('/temperature')
+@app.route('/temperature', methods=['GET'])
 def get_temperature():
     if sensor_data['temperature']:
         latest_data = {
