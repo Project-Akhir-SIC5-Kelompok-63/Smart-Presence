@@ -7,7 +7,7 @@ const char* ssid = "spres";
 const char* password = "1234";
 
 // Konfigurasi server REST API
-const char* serverPath = "http://192.168.0.111:5000/api/suhu";
+const char* serverPath = "http://192.168.0.111:5000/insert_temp_control"; // Adjust this path to match your API endpoint
 
 // Konfigurasi DHT
 #define DHTPIN 32
@@ -54,7 +54,7 @@ void loop() {
       http.addHeader("Content-Type", "application/json");
 
       // Membuat payload JSON
-      String payload = "{\"temperature\": " + String(t) + "}";
+      String payload = "{\"id_ruangan\": 1, \"current_temp\": " + String(t) + ", \"set_temp\": 25}";
 
       // Mengirim request POST
       int httpResponseCode = http.POST(payload);
@@ -74,5 +74,5 @@ void loop() {
   }
 
   // Delay 10 detik
-  delay(5000);
+  delay(10000); // Adjusted delay to 10 seconds
 }
