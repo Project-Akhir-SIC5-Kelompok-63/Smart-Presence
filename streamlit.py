@@ -1,80 +1,107 @@
 import streamlit as st
-import requests
 import pandas as pd
+import mysql.connector
 
-# Fungsi untuk mendapatkan data dari server Flask
-def fetch_temperature_data():
-    response = requests.get('http://192.168.43.73:5000/temperature')
-    if response.status_code == 200:
-        data = response.json()
-        return data['temperature'], data['humidity'], data['total_siswa']
-    else:
-        return None, None, None
+# Fungsi untuk menghubungkan ke database
+def connect_db():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="",
+        database="smart_presence"
+    )
+
+# Fungsi untuk mendapatkan data presensi dari database
+def fetch_presence():
+    db = connect_db()
+    cursor = db.cursor()
+    query = """
+    SELECT m.nama_mhs, m.foto, p.waktu 
+    FROM mahasiswa m
+    JOIN presensi p ON m.id_mhs = p.id_mhs
+    GROUP BY m.id_mhs
+    """
+    cursor.execute(query)
+    presence = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return presence
+
+# Fungsi untuk mendapatkan daftar ruangan dari database
+def fetch_rooms():
+    db = connect_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT DISTINCT id_ruangan FROM temp_control")
+    rooms = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return rooms
+
+# Fungsi untuk mendapatkan data suhu dari tabel temp_control berdasarkan ruangan yang dipilih
+def fetch_temperature_data(room_id):
+    db = connect_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT current_temp FROM temp_control WHERE id_ruangan = %s", (room_id,))
+    results = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return [result[0] for result in results]
 
 def streamlit_app():
     # Set page config
     st.set_page_config(
-        page_title="Temperature Dashboard",
+        page_title="Dasbor Pemantauan Presensi dan Suhu Ruangan",
         page_icon="🌡️",
         layout="wide",
     )
 
     # Title and description
-    st.title("Temperature Dashboard")
-    st.markdown("### Real-time Temperature Data from ESP32 and DHT22 Sensor")
+    st.title("Dasbor Pemantauan Presensi dan Suhu Ruangan")
     st.markdown("""
-        This dashboard displays real-time temperature data sent from an ESP32 device equipped with a DHT22 sensor. 
-        The data is updated continuously and visualized in the charts below.
+         Dasbor ini didukung oleh Streamlit dan Flask. Data dikumpulkan secara real-time dari perangkat ESP32 
+            yang dilengkapi dengan sensor DHT22 dan ditampilkan di sini untuk tujuan pemantauan absensi biometrik pengenalan wajah.
     """)
+
+    # Fetch and display room options
+    rooms = fetch_rooms()
+    room_options = {f"Kelas {room[0]}": room[0] for room in rooms}
+    selected_room = st.selectbox("Pilih Kelas", list(room_options.keys()))
 
     # Initialize empty lists to store data
     temperature_data = []
-    humidity_data = []
-    total_siswa_data = []
 
-    if st.button('Fetch Temperature Data'):
-        temperature, humidity, total_siswa = fetch_temperature_data()
-        if temperature is not None:
-            temperature_data.append(temperature)
-            humidity_data.append(humidity)
-            total_siswa_data.append(total_siswa)
-            
-            current_temp = temperature
+    if st.button('Lihat Data Suhu'):
+        room_id = room_options[selected_room]
+        temperature_data = fetch_temperature_data(room_id)
+        if temperature_data:
             avg_temp = sum(temperature_data) / len(temperature_data)
+            current_temp = temperature_data[-1]
 
             col1, col2, col3 = st.columns(3)
-            col1.metric("Current Temperature", f"{current_temp:.2f} °C")
-            col2.metric("Current Humidity", f"{humidity:.2f} %")
-            col3.metric("Total Students", f"{total_siswa}")
+            col1.metric("Suhu Saat Ini", f"{current_temp:.2f} °C")
+            col2.metric("Rata-Rata Suhu", f"{avg_temp:.2f} °C")
 
             # Temperature chart
             st.line_chart(pd.DataFrame({
-                'Temperature (°C)': temperature_data
+                'Suhu (°C)': temperature_data
             }, index=range(1, len(temperature_data) + 1)))
 
-            # Humidity chart
-            st.line_chart(pd.DataFrame({
-                'Humidity (%)': humidity_data
-            }, index=range(1, len(humidity_data) + 1)))
-
             # Display temperature data in DataFrame
-            st.header("Data Details")
+            st.header("Detail Data")
             df = pd.DataFrame({
-                'Time': range(1, len(temperature_data) + 1),
-                'Temperature (°C)': temperature_data,
-                'Humidity (%)': humidity_data,
-                'Total Siswa': total_siswa_data
+                'Waktu': range(1, len(temperature_data) + 1),
+                'Suhu (°C)': temperature_data
             })
             st.dataframe(df)
         else:
-            st.write("Failed to fetch temperature data.")
+            st.write("Tidak ada data suhu yang ditemukan untuk ruangan/kelas ini.")
 
-    # Additional UI elements for better look and feel
-    with st.expander("About this dashboard"):
-        st.markdown("""
-            This dashboard is powered by Streamlit and Flask. Data is collected in real-time from an ESP32 device 
-            equipped with a DHT22 sensor and displayed here for monitoring purposes.
-        """)
-
+   # Display presence data
+    st.header("Data Presensi")
+    presence_data = fetch_presence()
+    presence_df = pd.DataFrame(presence_data, columns=["Nama Mahasiswa", "Foto", "Waktu Presensi"])
+    presence_df.index = range(1, len(presence_df) + 1)  # Reset index starting from 1
+    st.dataframe(presence_df)
+            
 if __name__ == '__main__':
     streamlit_app()
