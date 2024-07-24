@@ -2,15 +2,11 @@ import cv2
 import face_recognition
 import pickle
 
-# Load the encodings and names from the file
 with open('face_encodings.pkl', 'rb') as f:
     known_face_encodings, known_face_names = pickle.load(f)
 
-# Video stream class with threading
-# 
-video_capture = cv2.VideoCapture(1)
+video_capture = cv2.VideoCapture(0)
 frame_count = 0
-process_every_n_frames = 5  # Process every 5th frame
 
 while True:
     ret, frame = video_capture.read()
