@@ -8,7 +8,7 @@ def connect_db():
         host="localhost",
         user="root",
         password="",
-        database="smart_presence2"
+        database="smart_presence"
     )
 
 # Fungsi untuk mendapatkan data presensi dari database
@@ -60,67 +60,71 @@ def streamlit_app():
         page_icon="🌡️",
         layout="wide",
     )
-
     # Title and description
     st.title("Website Pemantauan Presensi dan Suhu Ruangan")
     st.markdown("""
-         Website ini didukung oleh Streamlit dan Flask. Data dikumpulkan secara real-time dari perangkat ESP32 
-            yang dilengkapi dengan sensor DHT22 dan ditampilkan di sini untuk tujuan pemantauan absensi biometrik pengenalan wajah.
-    """)
+            Website ini didukung oleh Streamlit dan Flask. Data dikumpulkan secara real-time dari perangkat ESP32 
+                yang dilengkapi dengan sensor DHT22 dan ditampilkan di sini untuk tujuan pemantauan absensi biometrik pengenalan wajah.
+        """)
+    
+    # Set page tabs
+    tab1, tab2, tab3 = st.tabs(["Presensi Face-Recognition","Pemantauan Presensi", "Pemantauan Suhu"])
+    
+    with tab2:
+        # Display presence data
+        st.header("Data Presensi")
+        presence_data = fetch_presence()
+        presence_df = pd.DataFrame(presence_data, columns=["Nama Mahasiswa", "Foto", "Waktu Presensi"])
+        presence_df.index = range(1, len(presence_df) + 1)  # Reset index starting from 1
+        st.dataframe(presence_df)
+    
+    with tab3:
+        # Fetch and display room options
+        rooms = fetch_rooms()
+        room_options = {room[1]: room[0] for room in rooms}
+        selected_room = st.selectbox("Pilih Kelas", list(room_options.keys()))
 
-    # Fetch and display room options
-    rooms = fetch_rooms()
-    room_options = {room[1]: room[0] for room in rooms}
-    selected_room = st.selectbox("Pilih Kelas", list(room_options.keys()))
+        # Initialize empty lists to store data
+        temperature_data = []
+        humidity_data = []
+        time_data = []
+        room_names = []
 
-    # Initialize empty lists to store data
-    temperature_data = []
-    humidity_data = []
-    time_data = []
-    room_names = []
+        if st.button('Lihat Data Suhu'):
+            room_id = room_options[selected_room]
+            room_conditions = fetch_room_conditions(room_id)
+            if room_conditions:
+                for condition in room_conditions:
+                    temperature_data.append(condition[0])
+                    humidity_data.append(condition[1])
+                    time_data.append(condition[2])
+                    room_names.append(condition[3])
 
-    if st.button('Lihat Data Suhu'):
-        room_id = room_options[selected_room]
-        room_conditions = fetch_room_conditions(room_id)
-        if room_conditions:
-            for condition in room_conditions:
-                temperature_data.append(condition[0])
-                humidity_data.append(condition[1])
-                time_data.append(condition[2])
-                room_names.append(condition[3])
+                current_temp = temperature_data[-1]
+                current_humidity = humidity_data[-1]
 
-            current_temp = temperature_data[-1]
-            current_humidity = humidity_data[-1]
+                col1, col2 = st.columns(2)
+                col1.metric("Suhu Saat Ini", f"{current_temp:.2f} °C")
+                col2.metric("Kelembaban Saat Ini", f"{current_humidity:.2f} %")
 
-            col1, col2 = st.columns(2)
-            col1.metric("Suhu Saat Ini", f"{current_temp:.2f} °C")
-            col2.metric("Kelembaban Saat Ini", f"{current_humidity:.2f} %")
+                # Temperature and Humidity chart
+                st.line_chart(pd.DataFrame({
+                    'Suhu (°C)': temperature_data,
+                    'Kelembaban (%)': humidity_data
+                }, index=pd.to_datetime(time_data)))
 
-            # Temperature and Humidity chart
-            st.line_chart(pd.DataFrame({
-                'Suhu (°C)': temperature_data,
-                'Kelembaban (%)': humidity_data
-            }, index=pd.to_datetime(time_data)))
-
-            # Display temperature data in DataFrame
-            st.header("Detail Data")
-            df = pd.DataFrame({
-                'Ruangan': room_names,
-                'Suhu (°C)': temperature_data,
-                'Kelembaban (%)': humidity_data,
-                'Waktu': pd.to_datetime(time_data)
-            })
-            df.index = range(1, len(df) + 1)
-            st.dataframe(df)
-        else:
-            st.write("Tidak ada data suhu yang ditemukan untuk ruangan/kelas ini.")
-
-    # Display presence data
-    st.header("Data Presensi")
-    presence_data = fetch_presence()
-    presence_df = pd.DataFrame(presence_data, columns=["Nama Mahasiswa", "Foto", "Waktu Presensi"])
-    presence_df.index = range(1, len(presence_df) + 1)  # Reset index starting from 1
-    st.dataframe(presence_df)
+                # Display temperature data in DataFrame
+                st.header("Detail Data")
+                df = pd.DataFrame({
+                    'Ruangan': room_names,
+                    'Suhu (°C)': temperature_data,
+                    'Kelembaban (%)': humidity_data,
+                    'Waktu': pd.to_datetime(time_data)
+                })
+                df.index = range(1, len(df) + 1)
+                st.dataframe(df)
+            else:
+                st.write("Tidak ada data suhu yang ditemukan untuk ruangan/kelas ini.")
 
 if __name__ == '__main__':
     streamlit_app()
