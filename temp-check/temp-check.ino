@@ -7,7 +7,7 @@ const char* ssid = "spres";
 const char* password = "1234";
 
 // Konfigurasi server REST API
-const char* serverPath = "http://192.168.0.111:5000/insert_temp_control"; // Adjust this path to match your API endpoint
+const char* serverPath = "http://192.168.0.111:5000/insert_room_condition";
 
 // Konfigurasi DHT
 #define DHTPIN 32
@@ -31,7 +31,6 @@ void loop() {
   if ((WiFi.status() == WL_CONNECTED)) { // Jika terhubung ke WiFi
 
     // Membaca data dari sensor DHT11
-    float h = dht.readHumidity();
     float t = dht.readTemperature();
 
     // Periksa apakah pembacaan berhasil
@@ -54,7 +53,7 @@ void loop() {
       http.addHeader("Content-Type", "application/json");
 
       // Membuat payload JSON
-      String payload = "{\"id_ruangan\": 1, \"current_temp\": " + String(t) + ", \"set_temp\": 25}";
+      String payload = "{\"room_id\": 1, \"temperature\": " + String(t) + ", \"recorded_at\": \"" + getTimestamp() + "\"}";
 
       // Mengirim request POST
       int httpResponseCode = http.POST(payload);
@@ -74,5 +73,5 @@ void loop() {
   }
 
   // Delay 10 detik
-  delay(10000); // Adjusted delay to 10 seconds
+  delay(10000);
 }
