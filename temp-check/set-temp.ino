@@ -11,7 +11,7 @@
 const char* ssid = "ZTE_2.4G_UnYeTA";
 const char* password = "LaxRFCrP";
 
-const char* serverName = "127.0.0.1:5000/insert_temp_control";
+const char* serverName = "127.0.0.1:5000/insert_room_condition";
 
 const uint16_t kIrLed = 4;  // Pin GPIO untuk IR LED
 const uint16_t kRecvPin = 15;  // Pin GPIO untuk IR Receiver
