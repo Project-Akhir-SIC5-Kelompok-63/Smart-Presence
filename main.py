@@ -100,7 +100,6 @@ def streamlit_app():
                 if True in matches:
                     first_match_index = matches.index(True)
                     name = known_face_names[first_match_index]
-                    print(name)
 
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                 cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
