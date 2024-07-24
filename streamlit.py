@@ -1,14 +1,21 @@
+import streamlit as st
 import cv2
 import face_recognition
 import pickle
+import numpy as np
 
 # Load the encodings and names from the file
 with open('face_encodings.pkl', 'rb') as f:
     known_face_encodings, known_face_names = pickle.load(f)
 
+# Set up Streamlit
+st.title("Face Recognition App")
+run = st.checkbox('Run')
+
+FRAME_WINDOW = st.image([])
 video_capture = cv2.VideoCapture(0)
 
-while True:
+while run:
     ret, frame = video_capture.read()
     
     face_locations = face_recognition.face_locations(frame)
@@ -27,9 +34,8 @@ while True:
         cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
         cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
         
-    cv2.imshow('Video', frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+    FRAME_WINDOW.image(frame)
 
 video_capture.release()
 cv2.destroyAllWindows()
+
