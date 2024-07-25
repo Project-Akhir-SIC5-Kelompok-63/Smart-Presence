@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import mysql.connector
+import requests
 
 # Fungsi untuk menghubungkan ke database
 def connect_db():
@@ -16,16 +17,15 @@ def connect_db():
     )
 
 # Fungsi untuk mendapatkan data presensi dari database
-def fetch_presence():
+def fetch_presence(room_id):
     db = connect_db()
     cursor = db.cursor()
     query = """
-    SELECT u.name, u.face_id, a.timestamp 
-    FROM users u
-    JOIN attendance a ON u.id = a.user_id
-    GROUP BY u.id, a.timestamp
+    SELECT u.name, u.face_id, a.timestamp FROM users u 
+    JOIN attendance a ON u.id = a.user_id 
+    JOIN rooms r ON r.id = a.room_id WHERE a.room_id = %s
     """
-    cursor.execute(query)
+    cursor.execute(query, (room_id,))
     presence = cursor.fetchall()
     cursor.close()
     db.close()
@@ -75,12 +75,32 @@ def streamlit_app():
     tab1, tab2, tab3 = st.tabs(["Presensi Face-Recognition","Pemantauan Presensi", "Pemantauan Suhu"])
     
     with tab1:
+        st.header("Face Recognition App")
+        
+        # Initialize session state variables if not already present
+        if 'attendance_logged' not in st.session_state:
+            st.session_state.attendance_logged = {}
+        if 'previous_room' not in st.session_state:
+            st.session_state.previous_room = None
+        
+        # select room
+        rooms = fetch_rooms()
+        room_options = {room[1]: room[0] for room in rooms}
+        selected_room = st.selectbox("Pilih Kelas", list(room_options.keys()), key= "room_tab1")
+        
         # Load the encodings and names from the file
         with open('face_encodings.pkl', 'rb') as f:
-            known_face_encodings, known_face_names = pickle.load(f)
+            known_faces = pickle.load(f)
+            known_face_encodings = [face[0] for face in known_faces]
+            known_face_names = [face[1] for face in known_faces]
+            known_face_ids = [face[2] for face in known_faces]
 
-        # Set up Streamlit
-        st.title("Face Recognition App")
+        # Reset attendance_logged when room changes
+        if st.session_state.previous_room != selected_room:
+            st.session_state.attendance_logged = {}
+            st.session_state.previous_room = selected_room
+
+        # Set up face recognition
         run = st.checkbox('Run')
 
         FRAME_WINDOW = st.image([])
@@ -93,14 +113,34 @@ def streamlit_app():
             face_encodings = face_recognition.face_encodings(frame, face_locations)
             
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
-                
                 matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
 
                 name = "Unknown Person"
+                face_id = None
                 if True in matches:
                     first_match_index = matches.index(True)
                     name = known_face_names[first_match_index]
-
+                    face_id = known_face_ids[first_match_index]
+                    
+                if face_id:
+                    if face_id not in st.session_state.attendance_logged:
+                        try:
+                            response = requests.post('http://192.168.1.4:5000/insert_attendance_by_face', json={'face_id': face_id, 'room_id': room_options[selected_room]})
+                            if response.status_code == 200:
+                                response_json = response.json()
+                                if 'user_id' in response_json:
+                                    user_id = response_json['user_id']
+                                    st.success(f"Terimakasih {name}! Anda sudah melakukan presensi di kelas {selected_room}.")
+                                    st.session_state.attendance_logged[face_id] = True
+                                elif 'message' in response_json:
+                                    st.info(response_json['message'])
+                                    st.session_state.attendance_logged[face_id] = True
+                            else:
+                                st.error("Failed to log attendance.")
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Request failed: {e}")
+                            
+                # Display the name and UUID of the recognized face
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                 cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                 
@@ -110,10 +150,16 @@ def streamlit_app():
         cv2.destroyAllWindows()
     
     with tab2:
-        # Display presence data
         st.header("Data Presensi")
-        presence_data = fetch_presence()
-        presence_df = pd.DataFrame(presence_data, columns=["Nama Mahasiswa", "Foto", "Waktu Presensi"])
+        
+        # select room
+        rooms = fetch_rooms()
+        room_options = {room[1]: room[0] for room in rooms}
+        selected_room = st.selectbox("Pilih Kelas", list(room_options.keys()), key= "room_tab2")
+        
+        # Display presence data
+        presence_data = fetch_presence(room_options[selected_room])
+        presence_df = pd.DataFrame(presence_data, columns=["Nama Mahasiswa", "Face ID", "Waktu Presensi"])
         presence_df.index = range(1, len(presence_df) + 1)  # Reset index starting from 1
         st.dataframe(presence_df)
     
