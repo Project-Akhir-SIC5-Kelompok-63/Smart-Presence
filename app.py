@@ -26,6 +26,7 @@ class Rooms(db.Model):
 class RoomConditions(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'))
+    setting_ac_temp = db.Column(db.Float)
     temperature = db.Column(db.Float)
     recorded_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=True)
 
@@ -70,10 +71,12 @@ def insert_attendance():
 @app.route('/insert_room_condition', methods=['POST'])
 def insert_room_condition():
     data = request.json
+    created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     new_room_condition = RoomConditions(
         room_id=data['room_id'],
+        setting_ac_temp = data['set_temp'],
         temperature=data['temperature'],
-        recorded_at=datetime.strptime(data['recorded_at'], '%Y-%m-%d %H:%M:%S')
+        recorded_at=created_at,
     )
     db.session.add(new_room_condition)
     db.session.commit()

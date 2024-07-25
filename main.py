@@ -46,7 +46,7 @@ def fetch_room_conditions(room_id):
     db = connect_db()
     cursor = db.cursor()
     query = """
-    SELECT rc.temperature, rc.humidity, rc.recorded_at, r.name 
+    SELECT rc.temperature, rc.setting_ac_temp, rc.recorded_at, r.name 
     FROM room_conditions rc
     JOIN rooms r ON rc.room_id = r.id
     WHERE rc.room_id = %s
@@ -77,12 +77,6 @@ def streamlit_app():
     with tab1:
         st.header("Face Recognition App")
         
-        # Initialize session state variables if not already present
-        if 'attendance_logged' not in st.session_state:
-            st.session_state.attendance_logged = {}
-        if 'previous_room' not in st.session_state:
-            st.session_state.previous_room = None
-        
         # select room
         rooms = fetch_rooms()
         room_options = {room[1]: room[0] for room in rooms}
@@ -95,22 +89,24 @@ def streamlit_app():
             known_face_names = [face[1] for face in known_faces]
             known_face_ids = [face[2] for face in known_faces]
 
-        # Reset attendance_logged when room changes
-        if st.session_state.previous_room != selected_room:
-            st.session_state.attendance_logged = {}
-            st.session_state.previous_room = selected_room
-
         # Set up face recognition
         run = st.checkbox('Run')
 
         FRAME_WINDOW = st.image([])
-        video_capture = cv2.VideoCapture(0)
+        video_capture = cv2.VideoCapture(1)
 
         while run:
             ret, frame = video_capture.read()
             
-            face_locations = face_recognition.face_locations(frame)
-            face_encodings = face_recognition.face_encodings(frame, face_locations)
+            if not ret:
+                st.error("Failed to capture video")
+                break
+            
+            # Convert the frame from BGR to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            face_locations = face_recognition.face_locations(rgb_frame)
+            face_encodings = face_recognition.face_encodings(rgb_frame, face_locations)
             
             for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
                 matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
@@ -123,28 +119,25 @@ def streamlit_app():
                     face_id = known_face_ids[first_match_index]
                     
                 if face_id:
-                    if face_id not in st.session_state.attendance_logged:
-                        try:
-                            response = requests.post('http://192.168.1.4:5000/insert_attendance_by_face', json={'face_id': face_id, 'room_id': room_options[selected_room]})
-                            if response.status_code == 200:
-                                response_json = response.json()
-                                if 'user_id' in response_json:
-                                    user_id = response_json['user_id']
-                                    st.success(f"Terimakasih {name}! Anda sudah melakukan presensi di kelas {selected_room}.")
-                                    st.session_state.attendance_logged[face_id] = True
-                                elif 'message' in response_json:
-                                    st.info(response_json['message'])
-                                    st.session_state.attendance_logged[face_id] = True
-                            else:
-                                st.error("Failed to log attendance.")
-                        except requests.exceptions.RequestException as e:
-                            st.error(f"Request failed: {e}")
-                            
-                # Display the name and UUID of the recognized face
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-                cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                    try:
+                        response = requests.post('http://192.168.1.4:5000/insert_attendance_by_face', json={'face_id': face_id, 'room_id': room_options[selected_room]})
+                        if response.status_code == 200:
+                            response_json = response.json()
+                            if 'user_id' in response_json:
+                                user_id = response_json['user_id']
+                                st.success(f"Terimakasih {name}!, anda sudah presensi pada kelas {selected_room}.")
+                            elif 'message' in response_json:
+                                st.info(response_json['message'])
+                        else:
+                            st.error("Failed to log attendance.")
+                    except requests.exceptions.RequestException as e:
+                        st.error(f"Request failed: {e}")
+
+                cv2.rectangle(rgb_frame, (left, top), (right, bottom), (0, 0, 255), 2)
+                cv2.putText(rgb_frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                 
-            FRAME_WINDOW.image(frame)
+            # Display the frame with correct color
+            FRAME_WINDOW.image(rgb_frame)
 
         video_capture.release()
         cv2.destroyAllWindows()
@@ -171,9 +164,8 @@ def streamlit_app():
 
         # Initialize empty lists to store data
         temperature_data = []
-        humidity_data = []
+        setting_temp = []
         time_data = []
-        room_names = []
 
         if st.button('Lihat Data Suhu'):
             room_id = room_options[selected_room]
@@ -181,29 +173,28 @@ def streamlit_app():
             if room_conditions:
                 for condition in room_conditions:
                     temperature_data.append(condition[0])
-                    humidity_data.append(condition[1])
+                    setting_temp.append(condition[1])
                     time_data.append(condition[2])
-                    room_names.append(condition[3])
 
                 current_temp = temperature_data[-1]
-                current_humidity = humidity_data[-1]
 
                 col1, col2 = st.columns(2)
                 col1.metric("Suhu Saat Ini", f"{current_temp:.2f} °C")
-                col2.metric("Kelembaban Saat Ini", f"{current_humidity:.2f} %")
+                col2.metric("Suhu Yang Diatur", f"{setting_temp[-1]:.2f} °C")
 
-                # Temperature and Humidity chart
-                st.line_chart(pd.DataFrame({
+                # Temperature chart
+                col1.line_chart(pd.DataFrame({
                     'Suhu (°C)': temperature_data,
-                    'Kelembaban (%)': humidity_data
+                }, index=pd.to_datetime(time_data)))
+                col2.line_chart(pd.DataFrame({
+                    'Suhu (°C)': setting_temp,
                 }, index=pd.to_datetime(time_data)))
 
                 # Display temperature data in DataFrame
                 st.header("Detail Data")
                 df = pd.DataFrame({
-                    'Ruangan': room_names,
-                    'Suhu (°C)': temperature_data,
-                    'Kelembaban (%)': humidity_data,
+                    'Suhu Yang Diatur (°C)': setting_temp,
+                    'Suhu Asli (°C)': temperature_data,
                     'Waktu': pd.to_datetime(time_data)
                 })
                 df.index = range(1, len(df) + 1)
