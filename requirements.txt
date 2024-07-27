@@ -1,0 +1,10 @@
+opencv-python
+face_recognition
+streamlit
+flask
+Flask-SQLAlchemy
+mysql-connector-python
+pymsql
+requests
+jsonify
+numpy
