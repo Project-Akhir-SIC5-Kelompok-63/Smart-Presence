@@ -32,7 +32,7 @@ Go to the project directory
 
 Install libary
 ```bash
-pip install -r requirements.txt
+  pip install -r requirements.txt
 ```
 
 Running file save_encoding.py
