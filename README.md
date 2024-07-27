@@ -50,4 +50,4 @@ Start the server
   streamlit run main.py
 ```
 
-nb: disarankan menggunakan virtual environment
+nb: disarankan menggunakan virtual environment dan jika ingin menambahkan datasets bisa langsung taruh gambar di folder "datasets" yang sudah disediakan
