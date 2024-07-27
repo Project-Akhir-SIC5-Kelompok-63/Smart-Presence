@@ -7,6 +7,8 @@ import pandas as pd
 import mysql.connector
 import requests
 
+api_host = '192.168.1.4:5000' # change ip address to your local ip address
+
 # Fungsi untuk menghubungkan ke database
 def connect_db():
     return mysql.connector.connect(
@@ -120,7 +122,7 @@ def streamlit_app():
                     
                 if face_id:
                     try:
-                        response = requests.post('http://192.168.1.4:5000/insert_attendance_by_face', json={'face_id': face_id, 'room_id': room_options[selected_room]})
+                        response = requests.post(f'http://{api_host}/insert_attendance_by_face', json={'face_id': face_id, 'room_id': room_options[selected_room]})
                         if response.status_code == 200:
                             response_json = response.json()
                             if 'user_id' in response_json:

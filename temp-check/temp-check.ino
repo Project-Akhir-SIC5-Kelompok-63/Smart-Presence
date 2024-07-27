@@ -9,8 +9,10 @@
 #include <DHT.h>
 #include <TimeLib.h>
 
-const char* ssid = "ZTE_2.4G_UnYeTA";
+//change to your wifi ssid and password
+const char* ssid = "ZTE_2.4G_UnYeTA"; 
 const char* password = "LaxRFCrP";
+const char* serverIP = "192.168.1.4:5000";
 
 const uint16_t kIrLed = 4;  // Pin GPIO untuk IR LED
 const uint16_t kPanasonicAddress = 0x4004;   // Panasonic address (Pre data)
@@ -95,7 +97,7 @@ void loop() {
 
     // Cek data dari API untuk pengaturan AC
     HTTPClient http;
-    String serverPath = "http://192.168.1.4:5000/get_user_count";
+    String serverPath = "http://" + String(serverIP) + "/get_user_count";
     http.begin(serverPath); // Mulai koneksi ke server
     int httpCode = http.GET(); // Mengirimkan request GET
 
@@ -155,7 +157,7 @@ void loop() {
       lastUpdateTime = millis(); // Update waktu terakhir kali data dikirim
       if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        String serverPath = "http://192.168.1.4:5000/insert_room_condition";
+        String serverPath = "http://" + String(serverIP) + "/insert_room_condition";
 
         // Mengatur URL dan header
         http.begin(serverPath);
