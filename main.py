@@ -93,7 +93,7 @@ def streamlit_app():
         run = st.checkbox('Run')
 
         FRAME_WINDOW = st.image([])
-        video_capture = cv2.VideoCapture(1)
+        video_capture = cv2.VideoCapture(0)
 
         while run:
             ret, frame = video_capture.read()
