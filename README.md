@@ -40,19 +40,13 @@ Running file save_encoding.py
   py save_encoding.py
 ```
 
-Start API
-```bash
-  flask run -h [your IP Address]
-```
-
 Start the server
 ```bash
-  streamlit run main.py
+  py run_servers.py
 ```
 
-nb: disarankan menggunakan virtual environment
 ## Appendix
 nb :
 - disarankan menggunakan virtual environment
 - untuk menambahkan datasets bisa langsung taruh gambar di folder "datasets" yang sudah disediakan
-- jangan lupa ganti ip address pada file main.py, app.py, dan temp_check.ino
+- jangan lupa ganti ip address pada file temp_check.ino
